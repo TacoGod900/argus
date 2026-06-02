@@ -44,4 +44,13 @@ describe("buildArgusTools", () => {
     expect(built.takeReport()).toEqual({ satisfied: false, summary: "login returned 401" });
     expect(built.toolCallCount()).toBe(0);
   });
+
+  it("resetToolCallCount resets the browser tool counter to zero", async () => {
+    const { harness } = fakeHarness();
+    const built = buildArgusTools(harness);
+    await built.handlers.navigate({ url: "http://x" });
+    expect(built.toolCallCount()).toBe(1);
+    built.resetToolCallCount();
+    expect(built.toolCallCount()).toBe(0);
+  });
 });

@@ -37,7 +37,7 @@ export function buildArgusTools(harness: BrowserHarness): ArgusTools {
     (name: string) =>
     async (args: Record<string, unknown>): Promise<ToolText> => {
       toolCalls++;
-      return text(await harness.callTool(name, args ?? {}));
+      return text(await harness.callTool(name, args));
     };
 
   const handlers = {
@@ -49,30 +49,64 @@ export function buildArgusTools(harness: BrowserHarness): ArgusTools {
     wait_for: browserHandler("wait_for"),
     report_step: async (args: Record<string, unknown>): Promise<ToolText> => {
       report = {
-        satisfied: Boolean((args as { satisfied?: unknown }).satisfied),
-        summary: String((args as { summary?: unknown }).summary ?? "(no summary)"),
+        satisfied: Boolean(args["satisfied"]),
+        summary: String(args["summary"] ?? "(no summary)"),
       };
       return text("recorded");
     },
   };
 
-  const server = createSdkMcpServer({
-    name: SERVER_NAME,
-    version: "0.1.0",
-    tools: [
-      tool("navigate", "Navigate the browser to a URL.", { url: z.string().describe("Absolute URL to open.") }, handlers.navigate),
-      tool("click", "Click an element. `target` may be a CSS selector, a button/link name, or visible text.", { target: z.string() }, handlers.click),
-      tool("fill", "Type into an input. `target` may be a CSS selector, the input's placeholder, or its label.", { target: z.string(), value: z.string() }, handlers.fill),
-      tool("get_text", "Return the visible text of the current page (truncated).", {}, handlers.get_text),
-      tool("screenshot", "Capture a screenshot of the current page as evidence.", { label: z.string().describe("Short label for the shot.") }, handlers.screenshot),
-      tool("wait_for", "Wait for some text to appear, or just wait a number of milliseconds.", { text: z.string().optional(), ms: z.number().optional() }, handlers.wait_for),
-      tool("report_step", "Conclude the current step. Call exactly once when the step is finished.", { satisfied: z.boolean().describe("True only if the app behaved correctly for this step from a user's perspective."), summary: z.string().describe("One sentence: what you did and what you observed.") }, handlers.report_step),
-    ],
-  });
+  const argusTools = [
+    tool(
+      "navigate",
+      "Navigate the browser to a URL.",
+      { url: z.string().describe("Absolute URL to open.") },
+      handlers.navigate,
+    ),
+    tool(
+      "click",
+      "Click an element. `target` may be a CSS selector, a button/link name, or visible text.",
+      { target: z.string() },
+      handlers.click,
+    ),
+    tool(
+      "fill",
+      "Type into an input. `target` may be a CSS selector, the input's placeholder, or its label.",
+      { target: z.string(), value: z.string() },
+      handlers.fill,
+    ),
+    tool(
+      "get_text",
+      "Return the visible text of the current page (truncated).",
+      {},
+      handlers.get_text,
+    ),
+    tool(
+      "screenshot",
+      "Capture a screenshot of the current page as evidence.",
+      { label: z.string().describe("Short label for the shot.") },
+      handlers.screenshot,
+    ),
+    tool(
+      "wait_for",
+      "Wait for some text to appear, or just wait a number of milliseconds.",
+      { text: z.string().optional(), ms: z.number().optional() },
+      handlers.wait_for,
+    ),
+    tool(
+      "report_step",
+      "Conclude the current step. Call exactly once when the step is finished.",
+      {
+        satisfied: z.boolean().describe("True only if the app behaved correctly for this step from a user's perspective."),
+        summary: z.string().describe("One sentence: what you did and what you observed."),
+      },
+      handlers.report_step,
+    ),
+  ];
 
-  const toolNames = ["navigate", "click", "fill", "get_text", "screenshot", "wait_for", "report_step"].map(
-    (n) => `mcp__${SERVER_NAME}__${n}`,
-  );
+  const server = createSdkMcpServer({ name: SERVER_NAME, version: "0.1.0", tools: argusTools });
+
+  const toolNames = argusTools.map((t) => `mcp__${SERVER_NAME}__${t.name}`);
 
   return {
     server,
