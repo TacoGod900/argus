@@ -1,0 +1,14 @@
+# Argus target config for the bundled demo app.
+# Run from the argus project root:
+#   buggy branch:  npm run argus -- run -c examples/demo-app.config.yaml -s examples/signup-login.steps.md
+#   clean branch:  npm run argus -- run -c examples/demo-app.config.yaml -s examples/signup-login.steps.md --ref main
+repo: ./examples/demo-app
+base: main
+ref: bug/broken-login
+# No install step — the demo app has zero dependencies.
+start: node server.js
+baseUrl: http://localhost:3000
+readyCheck:
+  url: http://localhost:3000
+env:
+  PORT: "3000"

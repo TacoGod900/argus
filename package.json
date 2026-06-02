@@ -1,0 +1,32 @@
+{
+  "name": "argus",
+  "version": "0.1.0",
+  "description": "An AI agent that verifies software changes by running them — launches the app, drives real user flows in a browser, watches console + network, and reports PASS/FAIL with a root-cause pointer into the diff.",
+  "type": "module",
+  "bin": {
+    "argus": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "argus": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
+    "commander": "^12.1.0",
+    "playwright": "^1.49.0",
+    "yaml": "^2.6.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
