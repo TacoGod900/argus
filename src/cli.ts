@@ -34,9 +34,10 @@ program
       process.exitCode = verdict.pass ? 0 : 1;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/x-api-key|authentication_error|ANTHROPIC_API_KEY/i.test(msg)) {
+      if (/x-api-key|authentication_error|ANTHROPIC_API_KEY|not logged in|unauthor/i.test(msg)) {
         console.error(
-          "\nArgus needs an Anthropic API key. Set ANTHROPIC_API_KEY in your environment and try again.",
+          "\nArgus needs Claude access. Either log in with a Claude Pro/Max plan via Claude Code " +
+            "(with ANTHROPIC_API_KEY unset), or set ANTHROPIC_API_KEY to use the API. Then try again.",
         );
       } else {
         console.error(`\nArgus run failed: ${msg}`);

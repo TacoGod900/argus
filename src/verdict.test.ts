@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildVerdictPrompt, parseVerdict } from "./verdict.js";
+import { buildVerdictPrompt, parseVerdict, synthesizeVerdict } from "./verdict.js";
 import type { EvidenceSummary } from "./types.js";
 
 const summary: EvidenceSummary = {
@@ -68,5 +68,35 @@ describe("parseVerdict", () => {
 
   it("throws on a malformed payload", () => {
     expect(() => parseVerdict('{"pass": "yes"}', summary)).toThrow();
+  });
+});
+
+describe("synthesizeVerdict (transport)", () => {
+  it("parses the payload captured from the submit_verdict tool", async () => {
+    const payload = {
+      pass: false,
+      steps: [
+        { index: 1, pass: true, reason: "account created" },
+        { index: 2, pass: false, reason: "login returned 401" },
+      ],
+      root_cause: "src/auth.js: comparison inverted",
+      diff_citations: ["src/auth.js"],
+      summary: "Login broken by the auth diff.",
+    };
+    const v = await synthesizeVerdict(summary, {
+      _runVerdict: async (capture) => {
+        capture(payload);
+      },
+    });
+    expect(v.pass).toBe(false);
+    expect(v.steps[1]).toMatchObject({ index: 2, instruction: "log in", pass: false });
+    expect(v.rootCause).toContain("inverted");
+    expect(v.diffCitations).toEqual(["src/auth.js"]);
+  });
+
+  it("throws when the model never calls submit_verdict", async () => {
+    await expect(
+      synthesizeVerdict(summary, { _runVerdict: async () => {} }),
+    ).rejects.toThrow(/did not call submit_verdict/);
   });
 });

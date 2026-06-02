@@ -33,7 +33,7 @@ export const TargetConfigSchema = z.object({
   /** How to know the app is ready before driving it. */
   readyCheck: ReadyCheckSchema,
   /** Extra environment variables for the install/start commands. */
-  env: z.record(z.string()).default({}),
+  env: z.record(z.string(), z.string()).default({}),
 });
 
 export type ReadyCheck = z.infer<typeof ReadyCheckSchema>;

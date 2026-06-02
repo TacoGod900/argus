@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { query, tool, createSdkMcpServer, type Options } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { renderEvidenceForPrompt } from "./evidence.js";
 import type { EvidenceSummary, Verdict } from "./types.js";
@@ -19,32 +19,6 @@ const VerdictPayloadSchema = z.object({
   diff_citations: z.array(z.string()),
   summary: z.string(),
 });
-
-/** JSON Schema handed to the API for structured output. */
-const VERDICT_JSON_SCHEMA = {
-  type: "object",
-  properties: {
-    pass: { type: "boolean" },
-    steps: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          index: { type: "integer" },
-          pass: { type: "boolean" },
-          reason: { type: "string" },
-        },
-        required: ["index", "pass", "reason"],
-        additionalProperties: false,
-      },
-    },
-    root_cause: { type: ["string", "null"] },
-    diff_citations: { type: "array", items: { type: "string" } },
-    summary: { type: "string" },
-  },
-  required: ["pass", "steps", "root_cause", "diff_citations", "summary"],
-  additionalProperties: false,
-} as const;
 
 const SYSTEM_PROMPT = `You are Argus's verdict engine. You are given:
 1. The outcome of each natural-language test step the agent ran against a live app.
@@ -88,33 +62,74 @@ export function parseVerdict(payloadText: string, summary: EvidenceSummary): Ver
 
 export interface VerdictOptions {
   model?: string;
-  client?: Anthropic;
+  /** Test seam: receives a capture callback instead of calling the model. */
+  _runVerdict?: (capture: (payload: unknown) => void, prompt: string) => Promise<void>;
 }
 
-/** Call Claude to synthesize the final verdict from the evidence + diff. */
+/**
+ * Synthesize the final verdict from the evidence + diff. The model is given exactly one tool,
+ * `submit_verdict`, whose schema mirrors the verdict payload, and must call it once. The
+ * captured payload is validated and mapped by the (unchanged) pure `parseVerdict`.
+ */
 export async function synthesizeVerdict(
   summary: EvidenceSummary,
   opts: VerdictOptions = {},
 ): Promise<Verdict> {
-  const client = opts.client ?? new Anthropic();
   const model = opts.model ?? process.env.ARGUS_MODEL ?? DEFAULT_MODEL;
+  const prompt = buildVerdictPrompt(summary);
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 4096,
-    thinking: { type: "adaptive" },
-    output_config: {
-      effort: "high",
-      format: { type: "json_schema", schema: VERDICT_JSON_SCHEMA },
-    },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildVerdictPrompt(summary) }],
+  let captured: unknown = null;
+  const capture = (payload: unknown) => {
+    captured = payload;
+  };
+
+  if (opts._runVerdict) {
+    await opts._runVerdict(capture, prompt);
+  } else {
+    await runVerdictViaSdk(model, prompt, capture);
+  }
+
+  if (captured == null) {
+    throw new Error("verdict synthesis: model did not call submit_verdict");
+  }
+  // parseVerdict validates the payload (throwing on malformed shapes) and maps it onto Verdict.
+  return parseVerdict(JSON.stringify(captured), summary);
+}
+
+/** Run the verdict turn through the Agent SDK, forcing a single submit_verdict tool call. */
+async function runVerdictViaSdk(
+  model: string,
+  prompt: string,
+  capture: (payload: unknown) => void,
+): Promise<void> {
+  const server = createSdkMcpServer({
+    name: "verdict",
+    version: "0.1.0",
+    tools: [
+      tool(
+        "submit_verdict",
+        "Submit the final structured verdict. Call exactly once when you have decided.",
+        VerdictPayloadSchema.shape,
+        async (args) => {
+          capture(args);
+          return { content: [{ type: "text", text: "recorded" }] };
+        },
+      ),
+    ],
   });
 
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+  const options: Options = {
+    model,
+    systemPrompt: `${SYSTEM_PROMPT}\n\nWhen you have decided, call submit_verdict with the structured result. Do not reply in prose.`,
+    mcpServers: { verdict: server },
+    allowedTools: ["mcp__verdict__submit_verdict"],
+    settingSources: [],
+    permissionMode: "bypassPermissions",
+    allowDangerouslySkipPermissions: true,
+    maxTurns: 3,
+  };
 
-  return parseVerdict(text, summary);
+  for await (const _msg of query({ prompt, options })) {
+    // The submit_verdict handler captures the payload; nothing else to do here.
+  }
 }
