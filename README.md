@@ -18,8 +18,18 @@ config ─▶ TargetManager ─▶ BrowserHarness ─▶ AgentLoop ─▶ Verdic
 ```bash
 npm install
 npx playwright install chromium
-export ANTHROPIC_API_KEY=sk-ant-...   # PowerShell: $env:ANTHROPIC_API_KEY="sk-ant-..."
 ```
+
+## Auth: subscription or API key
+
+Argus runs on the Claude Agent SDK, so the **same** command works two ways:
+
+- **Claude Pro/Max subscription** (no per-token cost): log in with Claude Code and make sure
+  `ANTHROPIC_API_KEY` is **unset**. Argus uses your subscription.
+- **Anthropic API**: set `ANTHROPIC_API_KEY=sk-ant-...` (PowerShell: `$env:ANTHROPIC_API_KEY="sk-ant-..."`)
+  and the identical run bills the API.
+
+`ARGUS_MODEL` selects the model (default `claude-opus-4-8`).
 
 ## The 60-second demo
 
@@ -54,10 +64,12 @@ behavior, not a fixed answer.
   `base...ref` diff, tears the app down afterward.
 - **`src/browser.ts`** — Playwright wrapper exposing `navigate/click/fill/get_text/screenshot/wait_for`
   to the model, while passively capturing console + network into the evidence buffer.
-- **`src/agent.ts`** — Claude tool-use loop (adaptive thinking, prompt-cached system prompt). The agent
-  drives the browser per step and concludes each with a `report_step` verdict.
-- **`src/verdict.ts`** — feeds the evidence + diff back to Claude with a structured-output schema to get
-  per-step PASS/FAIL plus a root cause citing the diff.
+- **`src/tools.ts` / `src/session.ts`** — expose the browser actions + a `report_step` control tool as
+  an in-process MCP server, and drive one continuous Claude Agent SDK session across the steps.
+- **`src/agent.ts`** — runs each step as one turn of that session: the agent drives the browser tools
+  and concludes the step with a `report_step` verdict.
+- **`src/verdict.ts`** — feeds the evidence + diff back to Claude and forces a single `submit_verdict`
+  tool call to get per-step PASS/FAIL plus a root cause citing the diff.
 - **`src/report.ts`** — renders `report.md` and the terminal summary.
 
 ## Verify your own app
