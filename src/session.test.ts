@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { makeScriptedDriver } from "./session.js";
+import { makeScriptedDriver, usageFromResult } from "./session.js";
+
+describe("usageFromResult", () => {
+  it("reads the SDK result's snake_case usage fields", () => {
+    // The SDK `result.usage` is the Anthropic Usage shape (snake_case), not camelCase.
+    const usage = usageFromResult({
+      type: "result",
+      total_cost_usd: 0.0123,
+      usage: {
+        input_tokens: 5000,
+        output_tokens: 800,
+        cache_read_input_tokens: 4000,
+        cache_creation_input_tokens: 1000,
+      },
+    });
+    expect(usage).toEqual({
+      inputTokens: 5000,
+      outputTokens: 800,
+      cacheReadInputTokens: 4000,
+      cacheCreationInputTokens: 1000,
+      costUSD: 0.0123,
+    });
+  });
+
+  it("defaults missing fields to zero", () => {
+    expect(usageFromResult({ type: "result" })).toMatchObject({ inputTokens: 0, costUSD: 0 });
+  });
+});
 
 describe("SessionDriver (scripted)", () => {
   it("runs one scripted side effect per turn, in order", async () => {
@@ -23,9 +50,9 @@ describe("SessionDriver (scripted)", () => {
     expect(log).toEqual(["done"]);
   });
 
-  it("is a no-op once scripted turns are exhausted", async () => {
+  it("returns zero usage once scripted turns are exhausted", async () => {
     const driver = makeScriptedDriver([]);
-    await expect(driver.sendTurn("x")).resolves.toBeUndefined();
+    await expect(driver.sendTurn("x")).resolves.toMatchObject({ inputTokens: 0, outputTokens: 0 });
     await driver.close();
   });
 });

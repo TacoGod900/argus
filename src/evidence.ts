@@ -1,11 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type {
-  ConsoleEntry,
-  EvidenceSummary,
-  NetworkEntry,
-  ScreenshotEntry,
-  StepResult,
+import {
+  cacheHitRate,
+  type ConsoleEntry,
+  type EvidenceSummary,
+  type NetworkEntry,
+  type ScreenshotEntry,
+  type StepResult,
+  type UsageSummary,
 } from "./types.js";
 
 /**
@@ -69,6 +71,7 @@ export function buildEvidenceSummary(
   collector: EvidenceCollector,
   steps: StepResult[],
   diff: string | null,
+  usage?: UsageSummary,
 ): EvidenceSummary {
   return {
     steps,
@@ -76,7 +79,19 @@ export function buildEvidenceSummary(
     network: collector.getNetwork(),
     screenshots: collector.getScreenshots(),
     diff,
+    usage,
   };
+}
+
+/** One-line, human-readable token/cost summary. Pure — used in reports + terminal. */
+export function renderUsageLine(usage: UsageSummary): string {
+  const pct = Math.round(cacheHitRate(usage) * 100);
+  const cost = usage.costUSD > 0 ? `, ~$${usage.costUSD.toFixed(4)}` : "";
+  return (
+    `Tokens: ${usage.inputTokens.toLocaleString()} in / ${usage.outputTokens.toLocaleString()} out ` +
+    `across ${usage.turns} turn(s); cache hit-rate ${pct}% ` +
+    `(${usage.cacheReadInputTokens.toLocaleString()} read / ${usage.cacheCreationInputTokens.toLocaleString()} write)${cost}`
+  );
 }
 
 /** Network statuses >= 400 (or outright failures) are the interesting ones. */

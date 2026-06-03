@@ -14,15 +14,23 @@ function fakeHarness() {
 }
 
 describe("buildArgusTools", () => {
-  it("exposes the six browser tools plus report_step, namespaced for the SDK", () => {
+  it("exposes the browser tools plus view + report_step, namespaced for the SDK", () => {
     const { harness } = fakeHarness();
     const built = buildArgusTools(harness);
     expect(built.toolNames).toEqual([
       "mcp__argus__navigate",
+      "mcp__argus__snapshot",
       "mcp__argus__click",
       "mcp__argus__fill",
+      "mcp__argus__press",
+      "mcp__argus__select",
+      "mcp__argus__hover",
+      "mcp__argus__scroll",
+      "mcp__argus__go_back",
+      "mcp__argus__go_forward",
       "mcp__argus__get_text",
       "mcp__argus__screenshot",
+      "mcp__argus__view",
       "mcp__argus__wait_for",
       "mcp__argus__report_step",
     ]);

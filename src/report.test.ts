@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { renderMarkdownReport, renderTerminalSummary } from "./report.js";
-import type { EvidenceSummary, Verdict } from "./types.js";
+import {
+  renderCrawlReport,
+  renderCrawlTerminalSummary,
+  renderMarkdownReport,
+  renderTerminalSummary,
+} from "./report.js";
+import type { CrawlResult, EvidenceSummary, Verdict } from "./types.js";
 
 const summary: EvidenceSummary = {
   steps: [
@@ -66,5 +71,48 @@ describe("renderTerminalSummary", () => {
 
   it("includes ANSI codes when color is enabled", () => {
     expect(renderTerminalSummary(failVerdict, true)).toContain("\x1b[31m");
+  });
+});
+
+const crawlResult: CrawlResult = {
+  baseUrl: "http://app",
+  pages: [
+    { url: "http://app/", title: "Home", signature: "a", depth: 0, findingCount: 0 },
+    { url: "http://app/about", title: "About", signature: "b", depth: 1, findingCount: 1 },
+  ],
+  findings: [
+    { severity: "low", category: "console", page: "http://app/about", message: "Console warning: x" },
+    { severity: "high", category: "login", page: "http://app/login", message: "Login failed: 401" },
+  ],
+  usage: {
+    inputTokens: 1000,
+    outputTokens: 200,
+    cacheReadInputTokens: 800,
+    cacheCreationInputTokens: 200,
+    costUSD: 0,
+    turns: 2,
+  },
+  budgetExhausted: true,
+};
+
+describe("renderCrawlReport", () => {
+  it("orders findings by severity, lists the site map, and shows a cost line", () => {
+    const md = renderCrawlReport(crawlResult);
+    expect(md).toContain("1 high-severity issue(s)");
+    // high-severity finding appears before the low-severity one
+    expect(md.indexOf("Login failed")).toBeLessThan(md.indexOf("Console warning"));
+    expect(md).toContain("## Site map");
+    expect(md).toContain("http://app/about");
+    expect(md).toContain("budget limit");
+    expect(md).toContain("cache hit-rate 80%");
+  });
+});
+
+describe("renderCrawlTerminalSummary", () => {
+  it("summarizes severity counts and pages visited", () => {
+    const out = renderCrawlTerminalSummary(crawlResult);
+    expect(out).toContain("1 high");
+    expect(out).toContain("2 page(s) visited");
+    expect(out).toContain("budget hit");
   });
 });

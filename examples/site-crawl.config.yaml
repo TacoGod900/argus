@@ -1,0 +1,43 @@
+# Example Argus config for an autonomous whole-site crawl of a live/deployed app.
+# Run from the argus project root:
+#   npm run argus -- crawl -c examples/site-crawl.config.yaml
+#
+# `mode: url` points Argus at an already-running app — no git checkout / start command.
+mode: url
+baseUrl: https://staging.my-app.example.com
+readyCheck:
+  url: https://staging.my-app.example.com
+
+# Cheap model drives the crawl; Opus only synthesizes. Override per app as needed.
+models:
+  drive: claude-sonnet-4-6
+  synthesize: claude-opus-4-8
+
+# On-demand vision budget (downscaled screenshots the model actually sees).
+vision:
+  maxImages: 8
+
+# Credentials for authenticated areas. Secrets are redacted in all logs/reports.
+# Prefer env (ARGUS_LOGIN_URL/ARGUS_USERNAME/ARGUS_PASSWORD + --creds-from-env) for real secrets.
+auth:
+  loginUrl: https://staging.my-app.example.com/login
+  username: demo@example.com
+  password: hunter2
+  # Optional explicit selectors; omit to locate fields heuristically by label/placeholder.
+  usernameSelector: Email
+  passwordSelector: Password
+  submitSelector: Sign in
+
+# Budgets + safety rails — these bound both cost and blast radius.
+crawl:
+  maxPages: 25
+  maxDepth: 4
+  maxActionsPerPage: 12
+  scope: "Focus on signup, login, and content playback flows."
+  # Entries are regexes; `\b` anchors on a path-segment boundary so `/admin` blocks
+  # `/admin/users` but not `/administrator-guide`.
+  denylist:
+    - /logout\b
+    - /signout\b
+    - /admin\b
+    - /delete\b

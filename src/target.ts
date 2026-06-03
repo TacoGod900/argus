@@ -84,7 +84,14 @@ function runCommand(command: string, cwd: string, env: Record<string, string>): 
  * v1.x concern; for the demo we clone the fork manually and point `repo` at it.
  */
 export async function launchTarget(cfg: TargetConfig): Promise<LaunchedTarget> {
-  const repoDir = cfg.repo;
+  // URL mode: the app is already running somewhere — just confirm it's reachable.
+  if (cfg.mode === "url") {
+    await waitForReady(cfg);
+    return { baseUrl: cfg.baseUrl, diff: null, stop: async () => {} };
+  }
+
+  // repo mode: superRefine guarantees repo/start are present.
+  const repoDir = cfg.repo!;
 
   if (cfg.ref) {
     await git(repoDir, ["checkout", cfg.ref]);
@@ -96,7 +103,7 @@ export async function launchTarget(cfg: TargetConfig): Promise<LaunchedTarget> {
 
   const diff = await computeDiff(repoDir, cfg.base, cfg.ref);
 
-  const child: ChildProcess = spawn(cfg.start, {
+  const child: ChildProcess = spawn(cfg.start!, {
     cwd: repoDir,
     env: { ...process.env, ...cfg.env },
     shell: true,

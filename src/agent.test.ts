@@ -43,6 +43,7 @@ function fakeToolsAndDriver(scriptPerTurn: Array<StepReport | null>) {
   const driver: SessionDriver = {
     async sendTurn() {
       report = scriptPerTurn[turn++] ?? null;
+      return { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUSD: 0 };
     },
     async close() {},
   };
@@ -54,7 +55,7 @@ describe("runSteps", () => {
     const { harness, toolLog } = fakeHarness();
     const { tools, driver } = fakeToolsAndDriver([{ satisfied: true, summary: "logged in fine" }]);
 
-    const results = await runSteps(["log in"], harness, collector, {
+    const { results } = await runSteps(["log in"], harness, collector, {
       baseUrl: "http://app",
       _tools: tools,
       _driver: driver,
@@ -69,7 +70,7 @@ describe("runSteps", () => {
     const { harness } = fakeHarness();
     const { tools, driver } = fakeToolsAndDriver([{ satisfied: false, summary: "login returned 401" }]);
 
-    const results = await runSteps(["log in"], harness, collector, {
+    const { results } = await runSteps(["log in"], harness, collector, {
       baseUrl: "http://app",
       _tools: tools,
       _driver: driver,
@@ -83,7 +84,7 @@ describe("runSteps", () => {
     const { harness } = fakeHarness();
     const { tools, driver } = fakeToolsAndDriver([null, null, null]); // never reports
 
-    const results = await runSteps(["do a thing"], harness, collector, {
+    const { results } = await runSteps(["do a thing"], harness, collector, {
       baseUrl: "http://app",
       _tools: tools,
       _driver: driver,

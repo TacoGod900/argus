@@ -75,4 +75,31 @@ describe("BrowserHarness", () => {
     const files = await readdir(runDir);
     expect(files.some((f) => f.endsWith(".png"))).toBe(true);
   }, 40_000);
+
+  it("emits an a11y snapshot with element refs and clicks via a ref", async () => {
+    const runDir = await mkdtemp(join(tmpdir(), "argus-run-"));
+    const collector = new EvidenceCollector(runDir);
+    const harness = await BrowserHarness.launch(collector, { headless: true });
+
+    try {
+      await harness.callTool("navigate", { url: base });
+      const snap = await harness.callTool("snapshot", {});
+      // The snapshot is the accessibility tree with stable refs, not a text excerpt.
+      expect(snap).toMatch(/\[ref=e\d+\]/);
+      expect(snap).toContain("button");
+
+      // Pull the button's ref out of the snapshot and click it by ref.
+      const refLine = snap.split("\n").find((l) => l.includes("button"))!;
+      const ref = refLine.match(/\[ref=(e\d+)\]/)![1];
+      const clicked = await harness.callTool("click", { target: ref });
+      expect(clicked).toContain("clicked");
+
+      // view() returns a base64 image the model can actually see.
+      const img = await harness.viewImage();
+      expect(img.mime).toBe("image/png");
+      expect(img.base64.length).toBeGreaterThan(100);
+    } finally {
+      await harness.close();
+    }
+  }, 40_000);
 });
